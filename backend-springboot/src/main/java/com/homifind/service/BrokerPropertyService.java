@@ -23,19 +23,14 @@ public class BrokerPropertyService {
         if (!List.of("agent", "manager").contains(listingRole)) {
             throw new IllegalArgumentException("Unsupported broker listing role: " + listingRole);
         }
-
         return jdbcTemplate.queryForMap("""
             INSERT INTO public.property_broker_assignments
                 (property_id, owner_id, broker_id, agency_id, role_in_listing, status, created_by, updated_by)
             VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
             ON CONFLICT (property_id, broker_id)
             WHERE status IN ('pending', 'active') AND deleted_at IS NULL
-            DO UPDATE SET agency_id = EXCLUDED.agency_id,
-                          role_in_listing = EXCLUDED.role_in_listing,
-                          status = 'active',
-                          revoked_at = NULL,
-                          updated_at = NOW(),
-                          updated_by = EXCLUDED.updated_by
+            DO UPDATE SET agency_id = EXCLUDED.agency_id, role_in_listing = EXCLUDED.role_in_listing,
+                          status = 'active', revoked_at = NULL, updated_at = NOW(), updated_by = EXCLUDED.updated_by
             RETURNING id, property_id, owner_id, broker_id, agency_id, role_in_listing, status, permissions, assigned_at
             """, propertyId, ownerId, brokerId, agencyId, listingRole, ownerId, ownerId);
     }
@@ -45,10 +40,8 @@ public class BrokerPropertyService {
             SELECT a.id, a.property_id, a.owner_id, a.broker_id, a.agency_id,
                    a.role_in_listing, a.status, a.permissions, a.assigned_at,
                    p.full_name AS broker_name, p.email AS broker_email
-            FROM public.property_broker_assignments a
-            JOIN public.profiles p ON p.id = a.broker_id
-            WHERE a.owner_id = ? AND a.deleted_at IS NULL
-            ORDER BY a.assigned_at DESC
+            FROM public.property_broker_assignments a JOIN public.profiles p ON p.id = a.broker_id
+            WHERE a.owner_id = ? AND a.deleted_at IS NULL ORDER BY a.assigned_at DESC
             """, ownerId);
     }
 
@@ -58,12 +51,19 @@ public class BrokerPropertyService {
                    a.role_in_listing, a.status, a.permissions, a.assigned_at,
                    p.full_name AS owner_name, p.email AS owner_email,
                    pr.title AS property_title, pr.city, pr.status AS property_status
-            FROM public.property_broker_assignments a
-            JOIN public.profiles p ON p.id = a.owner_id
+            FROM public.property_broker_assignments a JOIN public.profiles p ON p.id = a.owner_id
             JOIN public.properties pr ON pr.id = a.property_id
-            WHERE a.broker_id = ? AND a.deleted_at IS NULL
-            ORDER BY a.assigned_at DESC
+            WHERE a.broker_id = ? AND a.deleted_at IS NULL ORDER BY a.assigned_at DESC
             """, brokerId);
+    }
+
+    public List<Map<String, Object>> availableBrokers() {
+        return jdbcTemplate.queryForList("""
+            SELECT DISTINCT p.id, p.full_name, p.email, p.company_name, p.license_number
+            FROM public.profiles p JOIN public.user_workspaces w ON w.user_id = p.id
+            WHERE p.role = 'broker' AND w.workspace = 'broker' AND w.is_active = TRUE AND p.deleted_at IS NULL
+            ORDER BY p.full_name ASC
+            """);
     }
 
     @Transactional
