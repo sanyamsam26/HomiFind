@@ -15,10 +15,27 @@ async function getCurrentUserId(): Promise<string> {
   return data.user.id;
 }
 
+function normalizeWorkspace(value: unknown): UserRole {
+  const workspace = String(value ?? "").toLowerCase();
+  if (!["renter", "owner", "broker"].includes(workspace)) {
+    throw new Error(`Unsupported workspace returned by backend: ${String(value)}`);
+  }
+  return workspace as UserRole;
+}
+
 export async function listWorkspaces(): Promise<WorkspaceRecord[]> {
   const userId = await getCurrentUserId();
   const response = await authenticatedFetch(`/workspaces/${userId}`);
-  return (await response.json()) as WorkspaceRecord[];
+  const records = (await response.json()) as Array<Record<string, unknown>>;
+
+  // Spring/JPA serializes the enum as uppercase (RENTER/OWNER/BROKER),
+  // while the React app consistently uses lowercase role values.
+  return records.map((record) => ({
+    workspace: normalizeWorkspace(record.workspace),
+    is_active: Boolean(record.is_active),
+    created_at: typeof record.created_at === "string" ? record.created_at : undefined,
+    updated_at: typeof record.updated_at === "string" ? record.updated_at : undefined,
+  }));
 }
 
 export async function enableWorkspace(workspace: UserRole): Promise<WorkspaceRecord> {
