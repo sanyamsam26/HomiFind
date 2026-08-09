@@ -26,7 +26,6 @@ import {
   Sun,
   ShieldCheck,
   Zap,
-  Elevator,
   Trees,
   Sparkles,
   Check,
