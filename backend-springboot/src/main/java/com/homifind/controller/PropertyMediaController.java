@@ -26,25 +26,24 @@ public class PropertyMediaController {
     }
 
     @PostMapping
-    public ResponseEntity<?> register(
-            @PathVariable UUID propertyId,
-            @RequestBody MediaRequest request,
-            JwtAuthenticationToken authentication) {
+    public ResponseEntity<?> register(@PathVariable UUID propertyId, @RequestBody MediaRequest request, JwtAuthenticationToken authentication) {
         UUID userId = UUID.fromString(authentication.getToken().getSubject());
         PropertyEntity property = propertyRepository.findById(propertyId).orElse(null);
         if (property == null || property.getDeletedAt() != null) return ResponseEntity.notFound().build();
         if (!userId.equals(property.getOwnerId())) return ResponseEntity.status(403).body("Only the property owner can add media.");
         if (request.storagePath() == null || request.storagePath().isBlank()) return ResponseEntity.badRequest().body("storagePath is required.");
-        if (!request.storagePath().startsWith(userId + "/" + propertyId + "/")) {
-            return ResponseEntity.badRequest().body("storagePath must be inside the authenticated owner's property folder.");
+        String requiredPrefix = userId + "/" + propertyId + "/";
+        if (!request.storagePath().startsWith(requiredPrefix)) return ResponseEntity.badRequest().body("Invalid property media path.");
+        if (request.mediaType() != null && !request.mediaType().equals("image")) return ResponseEntity.badRequest().body("Only image media is supported by this API.");
+        if (mediaRepository.existsByPropertyIdAndStoragePathAndDeletedAtIsNull(propertyId, request.storagePath())) return ResponseEntity.badRequest().body("Media is already registered.");
+        if (request.primary()) {
+            mediaRepository.findByPropertyIdAndDeletedAtIsNullOrderByDisplayOrderAsc(propertyId).forEach(existing -> {
+                if (existing.isPrimary()) { existing.setPrimary(false); mediaRepository.save(existing); }
+            });
         }
-        if (mediaRepository.existsByPropertyIdAndStoragePathAndDeletedAtIsNull(propertyId, request.storagePath())) {
-            return ResponseEntity.ok(mediaRepository.findByPropertyIdAndDeletedAtIsNullOrderByDisplayOrderAsc(propertyId));
-        }
-        PropertyMediaEntity media = PropertyMediaEntity.builder()
-                .propertyId(propertyId).storagePath(request.storagePath())
-                .mediaType(request.mediaType() == null ? "image" : request.mediaType())
-                .caption(request.caption()).primary(request.primary()).displayOrder(request.displayOrder()).build();
+        PropertyMediaEntity media = PropertyMediaEntity.builder().propertyId(propertyId).storagePath(request.storagePath())
+                .mediaType("image").caption(request.caption()).primary(request.primary())
+                .displayOrder(Math.max(0, request.displayOrder())).build();
         return ResponseEntity.ok(mediaRepository.save(media));
     }
 
