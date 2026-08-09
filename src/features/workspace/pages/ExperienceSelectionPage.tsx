@@ -10,6 +10,9 @@ export function ExperienceSelectionPage() {
 
   const selectWorkspace = (workspace: WorkspaceType) => {
     setCurrentRole(workspace);
+    localStorage.setItem("homifind_workspace_selected", "true");
+    localStorage.setItem("homifind_active_workspace", workspace);
+
     const option = WORKSPACE_OPTIONS.find((item) => item.id === workspace);
     if (!option) return;
 
@@ -27,8 +30,11 @@ export function ExperienceSelectionPage() {
   };
 
   const chooseBoth = () => {
+    localStorage.setItem("homifind_workspace_selected", "true");
+    localStorage.setItem("homifind_has_owner_workspace", "true");
+    localStorage.setItem("homifind_active_workspace", "renter");
     setCurrentRole("renter");
-    triggerToast("You can use both renter and owner experiences from the same account.");
+    triggerToast("Both renter and owner experiences are enabled for this account.");
     navigate("/app/onboarding");
   };
 
