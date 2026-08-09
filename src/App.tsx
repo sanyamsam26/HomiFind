@@ -1,26 +1,23 @@
 import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppProvider } from "./context/AppContext";
 
-// Shared Layouts
 import { PublicLayout } from "./layouts/PublicLayout";
 import { AuthLayout } from "./layouts/AuthLayout";
 import { DashboardLayout } from "./layouts/DashboardLayout";
 import { ProtectedLayout } from "./layouts/ProtectedLayout";
 
-// Marketing Routes
 import { HomePage } from "./pages/marketing/HomePage";
 import { AboutPage } from "./pages/marketing/AboutPage";
 import { PricingPage } from "./pages/marketing/PricingPage";
 import { ContactPage } from "./pages/marketing/ContactPage";
 
-// Auth Routes
 import { LoginPage } from "./pages/auth/LoginPage";
 import { SignupPage } from "./pages/auth/SignupPage";
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
 import { OnboardingPage } from "./pages/auth/OnboardingPage";
+import { ExperienceSelectionPage } from "./features/workspace/pages/ExperienceSelectionPage";
 
-// Application Routes (Renter)
 import { ExplorePage } from "./pages/app/ExplorePage";
 import { PropertyDetailPage } from "./pages/app/PropertyDetailPage";
 import { ApplicationsPage } from "./pages/app/ApplicationsPage";
@@ -32,7 +29,6 @@ import { NotificationsPage } from "./pages/app/NotificationsPage";
 import { ProfilePage } from "./pages/app/ProfilePage";
 import { VisitsPage } from "./pages/app/VisitsPage";
 
-// Owner Routes
 import { OwnerDashboardPage } from "./pages/owner/OwnerDashboardPage";
 import { OwnerPropertiesPage } from "./pages/owner/OwnerPropertiesPage";
 import { NewPropertyPage } from "./pages/owner/NewPropertyPage";
@@ -47,13 +43,11 @@ import { OwnerAnalyticsPage } from "./pages/owner/OwnerAnalyticsPage";
 import { OwnerVerificationPage } from "./pages/owner/OwnerVerificationPage";
 import { OwnerSubscriptionPage } from "./pages/owner/OwnerSubscriptionPage";
 
-// Broker Routes
 import { BrokerOverviewPage } from "./pages/broker/BrokerOverviewPage";
 import { BrokerListingsPage } from "./pages/broker/BrokerListingsPage";
 import { BrokerApplicationsPage } from "./pages/broker/BrokerApplicationsPage";
 import { BrokerMessagesPage } from "./pages/broker/BrokerMessagesPage";
 
-// System Routes
 import { LoadingPage } from "./pages/system/LoadingPage";
 import { ErrorPage } from "./pages/system/ErrorPage";
 import { NotFoundPage } from "./pages/system/NotFoundPage";
@@ -63,10 +57,9 @@ export default function App() {
     <AppProvider>
       <BrowserRouter>
         <Routes>
-          {/* Default Start Route - Always Start from Signup Page */}
-          <Route path="/" element={<Navigate to="/auth/signup" replace />} />
+          {/* Public entry point. Authenticated users are redirected by their workspace flow. */}
+          <Route path="/" element={<Navigate to="/discover" replace />} />
 
-          {/* Public / Marketing Layout Routes */}
           <Route element={<PublicLayout />}>
             <Route path="/discover" element={<HomePage />} />
             <Route path="/about" element={<AboutPage />} />
@@ -74,17 +67,20 @@ export default function App() {
             <Route path="/contact" element={<ContactPage />} />
           </Route>
 
-          {/* Authentication Layout Routes */}
           <Route element={<AuthLayout />}>
             <Route path="/auth/login" element={<LoginPage />} />
             <Route path="/auth/signup" element={<SignupPage />} />
             <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
           </Route>
 
-          {/* Experience Selector Onboarding Route */}
-          <Route path="/onboarding" element={<OnboardingPage />} />
+          {/* Post-auth decision point. This is where renter/owner/broker intent is selected. */}
+          <Route element={<ProtectedLayout />}>
+            <Route path="/choose-experience" element={<ExperienceSelectionPage />} />
 
-          {/* Application Routes (Renter Workspace) */}
+            {/* Renter onboarding is deliberately separate from workspace selection. */}
+            <Route path="/app/onboarding" element={<OnboardingPage />} />
+          </Route>
+
           <Route element={<ProtectedLayout requiredRole="renter" />}>
             <Route element={<DashboardLayout />}>
               <Route path="/app" element={<Navigate to="/app/explore" replace />} />
@@ -101,7 +97,6 @@ export default function App() {
             </Route>
           </Route>
 
-          {/* Owner Routes */}
           <Route element={<ProtectedLayout requiredRole="owner" />}>
             <Route element={<DashboardLayout />}>
               <Route path="/owner" element={<Navigate to="/owner/dashboard" replace />} />
@@ -121,7 +116,6 @@ export default function App() {
             </Route>
           </Route>
 
-          {/* Broker Routes */}
           <Route element={<ProtectedLayout requiredRole="broker" />}>
             <Route element={<DashboardLayout />}>
               <Route path="/broker" element={<Navigate to="/broker/overview" replace />} />
@@ -132,7 +126,6 @@ export default function App() {
             </Route>
           </Route>
 
-          {/* System Fallback & 404 Routes */}
           <Route path="/loading" element={<LoadingPage />} />
           <Route path="/error" element={<ErrorPage />} />
           <Route path="*" element={<NotFoundPage />} />
