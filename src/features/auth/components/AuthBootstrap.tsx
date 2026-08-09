@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useApp } from "../../../context/AppContext";
 import { getSessionUser, mapAuthUser } from "../../../services/auth-service";
 import { supabase } from "../../../lib/supabase";
@@ -8,52 +8,63 @@ import { listWorkspaces, workspaceHome } from "../../../services/workspace-servi
 export function AuthBootstrap() {
   const { setCurrentUser } = useApp();
   const navigate = useNavigate();
-  const location = useLocation();
 
   useEffect(() => {
     let active = true;
-    let redirecting = false;
 
-    const applyUser = async (sessionUser: Parameters<typeof mapAuthUser>[0] | null) => {
+    const bootstrap = async () => {
+      const { data } = await supabase.auth.getSession();
+      const sessionUser = data.session?.user ?? null;
+
       if (!sessionUser) {
         if (active) setCurrentUser(null);
         return;
       }
+
       const user = await getSessionUser();
-      if (active) setCurrentUser(user ?? mapAuthUser(sessionUser));
-    };
+      if (!active) return;
 
-    const bootstrap = async () => {
-      const { data } = await supabase.auth.getSession();
-      await applyUser(data.session?.user ?? null);
+      setCurrentUser(user ?? mapAuthUser(sessionUser));
 
-      if (!active || !data.session || location.pathname !== "/auth/callback" || redirecting) return;
-      redirecting = true;
+      if (window.location.pathname !== "/auth/callback") return;
+
       try {
-        const enabled = (await listWorkspaces()).filter((item) => item.is_active).map((item) => item.workspace);
+        const enabled = (await listWorkspaces())
+          .filter((item) => item.is_active)
+          .map((item) => item.workspace);
+        if (!active) return;
+
         const preferred = enabled.includes("renter") ? "renter" : enabled[0];
         navigate(preferred ? workspaceHome(preferred) : "/choose-experience", { replace: true });
       } catch {
-        navigate("/choose-experience", { replace: true });
+        if (active) navigate("/choose-experience", { replace: true });
       }
     };
 
     void bootstrap();
+
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!active) return;
+
       if (event === "SIGNED_OUT") {
-        if (active) setCurrentUser(null);
+        setCurrentUser(null);
         return;
       }
-      void applyUser(session?.user ?? null);
+
+      // Login/signup flows already synchronize the backend profile. Do not call
+      // /auth/sync again for every auth-state event or route change.
+      if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session?.user) {
+        setCurrentUser(mapAuthUser(session.user));
+      }
     });
 
     return () => {
       active = false;
       listener.subscription.unsubscribe();
     };
-    // setCurrentUser is a stable context action for this bootstrap lifecycle.
+    // This is a single application-level auth bootstrap lifecycle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, navigate]);
+  }, []);
 
   return null;
 }
