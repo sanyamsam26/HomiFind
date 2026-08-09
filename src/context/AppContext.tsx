@@ -1,5 +1,13 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { UserRole, Property, Application, Lease, MaintenanceTicket, Message, UserPreferences } from "../types/database";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import {
+  UserRole,
+  Property,
+  Application,
+  Lease,
+  MaintenanceTicket,
+  Message,
+  UserPreferences,
+} from "../types/database";
 import {
   INITIAL_PROPERTIES,
   MOCK_APPLICATIONS,
@@ -53,22 +61,42 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+function readStoredUser(): UserProfile | null {
+  try {
+    const saved = localStorage.getItem("homifind_active_user");
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+}
+
+function readStoredRole(): UserRole {
+  const stored = localStorage.getItem("homifind_active_workspace");
+  return stored === "owner" || stored === "broker" || stored === "renter" ? stored : "renter";
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentRole, setCurrentRole] = useState<UserRole>("renter");
-  const [currentUser, setCurrentStateUser] = useState<UserProfile | null>(() => {
-    try {
-      const saved = localStorage.getItem("homifind_active_user");
-      return saved ? JSON.parse(saved) : {
-        id: "user-sanyam-samm25",
-        name: "sanyam.samm25",
-        email: "sanyam.samm25@gmail.com",
-        role: "renter",
-        verified: true,
-      };
-    } catch {
-      return null;
-    }
-  });
+  // No hardcoded/demo user is created. Authentication is an explicit application state.
+  const [currentRole, setCurrentRoleState] = useState<UserRole>(readStoredRole);
+  const [currentUser, setCurrentStateUser] = useState<UserProfile | null>(readStoredUser);
+  const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
+
+  const [properties, setProperties] = useState<Property[]>(INITIAL_PROPERTIES);
+  const [savedPropertyIds, setSavedPropertyIds] = useState<string[]>([]);
+  const [applications, setApplications] = useState<Application[]>(MOCK_APPLICATIONS);
+  const [leases, setLeases] = useState<Lease[]>(MOCK_LEASES);
+  const [maintenanceTickets, setMaintenanceTickets] = useState<MaintenanceTicket[]>(MOCK_MAINTENANCE_TICKETS);
+  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
+  const [isLoadingDb, setIsLoadingDb] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"signup" | "signin">("signup");
+
+  const setCurrentRole = (role: UserRole) => {
+    setCurrentRoleState(role);
+    localStorage.setItem("homifind_active_workspace", role);
+  };
 
   const setCurrentUser = (user: UserProfile | null) => {
     setCurrentStateUser(user);
@@ -76,80 +104,68 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem("homifind_active_user", JSON.stringify(user));
     } else {
       localStorage.removeItem("homifind_active_user");
+      localStorage.removeItem("homifind_active_workspace");
+      localStorage.removeItem("homifind_workspace_selected");
+      localStorage.removeItem("homifind_has_owner_workspace");
+      setCurrentRoleState("renter");
     }
   };
 
-  const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
-
-  const [properties, setProperties] = useState<Property[]>(INITIAL_PROPERTIES);
-  const [savedPropertyIds, setSavedPropertyIds] = useState<string[]>(["prop-1", "prop-2"]);
-  const [applications, setApplications] = useState<Application[]>(MOCK_APPLICATIONS);
-  const [leases, setLeases] = useState<Lease[]>(MOCK_LEASES);
-  const [maintenanceTickets, setMaintenanceTickets] = useState<MaintenanceTicket[]>(MOCK_MAINTENANCE_TICKETS);
-  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
-  const [isLoadingDb, setIsLoadingDb] = useState(false);
-
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<"signup" | "signin">("signup");
-
-  // Load preferences dynamically on user load or switch
   useEffect(() => {
+    let cancelled = false;
     async function loadPreferences() {
       if (!currentUser?.id) {
         setUserPreferences(null);
         return;
       }
       const prefs = await dbService.fetchUserPreferences(currentUser.id);
-      setUserPreferences(prefs);
+      if (!cancelled) setUserPreferences(prefs);
     }
-    loadPreferences();
-  }, [currentUser]);
+    void loadPreferences();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id]);
 
-  // Sync properties and calculate dynamic match scores when preferences change
   useEffect(() => {
+    let cancelled = false;
     async function syncDatabaseData() {
+      if (!currentUser?.id) {
+        setProperties(INITIAL_PROPERTIES);
+        return;
+      }
       setIsLoadingDb(true);
       try {
         const fetchedProps = await dbService.fetchProperties();
-        const rawProps = fetchedProps && fetchedProps.length > 0 ? fetchedProps : INITIAL_PROPERTIES;
-        
-        if (currentUser?.id) {
-          const personalized = await dbService.fetchPersonalizedProperties(
-            currentUser.id,
-            userPreferences,
-            rawProps
-          );
-          setProperties(personalized);
-        } else {
-          setProperties(rawProps);
-        }
-
+        const rawProps = fetchedProps.length > 0 ? fetchedProps : INITIAL_PROPERTIES;
+        const personalized = await dbService.fetchPersonalizedProperties(
+          currentUser.id,
+          userPreferences,
+          rawProps
+        );
         const fetchedApps = await dbService.fetchApplications();
-        if (fetchedApps && fetchedApps.length > 0) {
-          setApplications(fetchedApps);
+        if (!cancelled) {
+          setProperties(personalized);
+          if (fetchedApps.length > 0) setApplications(fetchedApps);
         }
-      } catch (e) {
-        console.log("Supabase/API fetch fallback activated:", e);
+      } catch (error) {
+        console.error("Failed to synchronize HomiFind data", error);
       } finally {
-        setIsLoadingDb(false);
+        if (!cancelled) setIsLoadingDb(false);
       }
     }
-    syncDatabaseData();
-  }, [currentUser, userPreferences]);
+    void syncDatabaseData();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id, userPreferences]);
 
   const saveUserPreferences = async (newPrefs: UserPreferences): Promise<boolean> => {
-    const userId = currentUser?.id || "user-renter-1";
-    const fullPrefs: UserPreferences = {
-      ...newPrefs,
-      hasCompletedOnboarding: true,
-    };
+    if (!currentUser?.id) return false;
+    const fullPrefs: UserPreferences = { ...newPrefs, hasCompletedOnboarding: true };
     setUserPreferences(fullPrefs);
-    const success = await dbService.saveUserPreferences(userId, fullPrefs);
-    if (success) {
-      triggerToast("AI Preferences saved to your profile!");
-    }
+    const success = await dbService.saveUserPreferences(currentUser.id, fullPrefs);
+    triggerToast(success ? "AI preferences saved." : "Preferences saved locally. We will sync them when available.");
     return success;
   };
 
@@ -159,7 +175,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
+    window.setTimeout(() => setToastMessage(null), 4000);
   };
 
   const handleOpenAuth = (mode: "signup" | "signin" = "signup") => {
@@ -170,166 +186,151 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logout = () => {
     setCurrentUser(null);
     setUserPreferences(null);
-    localStorage.removeItem("homifind_active_user");
     triggerToast("Signed out successfully");
   };
 
   const handleToggleSaveProperty = (id: string) => {
     setSavedPropertyIds((prev) =>
-      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
-    );
-    const isSavedNow = !savedPropertyIds.includes(id);
-    triggerToast(
-      isSavedNow ? "Property saved to wishlist" : "Removed property from wishlist"
+      prev.includes(id) ? prev.filter((propertyId) => propertyId !== id) : [...prev, id]
     );
   };
 
   const handleApplySubmit = (property: Property, formData: any) => {
+    const now = new Date().toISOString();
     const newApp: Application = {
       id: `app-${Date.now()}`,
       property_id: property.id,
-      renter_id: currentUser?.id || "user-renter-1",
+      renter_id: currentUser?.id || "",
       status: "submitted",
       proposed_move_in_date: formData.moveInDate,
-      occupants_count: formData.occupants,
-      annual_income: formData.income,
-      employment_status: formData.employment,
-      has_pets: true,
-      background_check_consent: true,
+      occupants_count: Number(formData.occupants) || 1,
+      annual_income: Number(formData.income) || 0,
+      employment_status: formData.employment || "not_provided",
+      has_pets: Boolean(formData.hasPets),
+      background_check_consent: Boolean(formData.backgroundCheckConsent),
       document_paths: [],
-      notes: "Submitted via HomiFind AI Application portal",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      notes: "Submitted via HomiFind",
+      created_at: now,
+      updated_at: now,
       property,
-      renter: {
-        id: currentUser?.id || "user-renter-1",
-        role: "renter",
-        full_name: currentUser?.name || "Alex Rivera",
-        email: currentUser?.email || "alex.rivera@example.com",
-        is_verified: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
     };
     setApplications((prev) => [newApp, ...prev]);
-    triggerToast(`Application submitted for ${property.title}!`);
+    triggerToast(`Application submitted for ${property.title}.`);
   };
 
   const handleCreateMaintenance = (ticketData: any) => {
+    const now = new Date().toISOString();
     const newTicket: MaintenanceTicket = {
       id: `maint-${Date.now()}`,
       property_id: ticketData.property_id,
-      renter_id: currentUser?.id || "user-renter-1",
+      renter_id: currentUser?.id || "",
       title: ticketData.title,
       description: ticketData.description,
       priority: ticketData.priority,
       status: "open",
       attachment_paths: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      property: properties[0],
+      created_at: now,
+      updated_at: now,
+      property: properties.find((property) => property.id === ticketData.property_id),
     };
     setMaintenanceTickets((prev) => [newTicket, ...prev]);
-    triggerToast("Maintenance request submitted to property owner");
+    triggerToast("Maintenance request created.");
   };
 
   const handleSendMessage = (text: string) => {
+    if (!currentUser?.id || !text.trim()) return;
     const newMsg: Message = {
       id: `msg-${Date.now()}`,
       conversation_id: "conv-1",
-      sender_id: currentUser?.id || "user-renter-1",
-      content: text,
+      sender_id: currentUser.id,
+      content: text.trim(),
       created_at: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, newMsg]);
   };
 
   const handleCreateProperty = (newProp: Partial<Property>) => {
+    const now = new Date().toISOString();
     const fullProp: Property = {
       id: `prop-${Date.now()}`,
       title: newProp.title || "New Property Unit",
-      description: newProp.description || "Spacious urban residence",
+      description: newProp.description || "",
       property_type: newProp.property_type || "apartment",
       status: "available",
-      rent_price: newProp.rent_price || 2500,
-      deposit_amount: newProp.deposit_amount || 2500,
-      utilities_included: true,
-      bedrooms: newProp.bedrooms || 2,
-      bathrooms: newProp.bathrooms || 1.5,
-      square_feet: newProp.square_feet || 900,
-      is_pet_friendly: true,
-      is_furnished: false,
-      amenities: newProp.amenities || ["In-unit Washer", "Pet Friendly", "Balcony"],
-      address_line1: newProp.address_line1 || "100 Prime Street",
-      city: newProp.city || "New York",
-      state: newProp.state || "NY",
-      zip_code: newProp.zip_code || "10001",
-      country: "USA",
-      featured: true,
-      view_count: 12,
-      primary_image_url: newProp.primary_image_url || "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80",
-      owner_id: currentUser?.id || "owner-1",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      rent_price: newProp.rent_price || 0,
+      deposit_amount: newProp.deposit_amount || 0,
+      utilities_included: newProp.utilities_included ?? false,
+      bedrooms: newProp.bedrooms || 0,
+      bathrooms: newProp.bathrooms || 0,
+      square_feet: newProp.square_feet,
+      is_pet_friendly: newProp.is_pet_friendly ?? false,
+      is_furnished: newProp.is_furnished ?? false,
+      amenities: newProp.amenities || [],
+      address_line1: newProp.address_line1 || "",
+      city: newProp.city || "",
+      state: newProp.state || "",
+      zip_code: newProp.zip_code || "",
+      country: newProp.country || "India",
+      featured: false,
+      view_count: 0,
+      primary_image_url: newProp.primary_image_url,
+      owner_id: currentUser?.id || "",
+      created_at: now,
+      updated_at: now,
     };
-
     setProperties((prev) => [fullProp, ...prev]);
-    triggerToast(`Listing created & live: ${fullProp.title}`);
+    triggerToast(`Listing created: ${fullProp.title}`);
   };
 
   const handleUpdateApplicationStatus = (appId: string, newStatus: Application["status"]) => {
-    setApplications((prev) =>
-      prev.map((a) => (a.id === appId ? { ...a, status: newStatus } : a))
-    );
-    triggerToast(`Application status updated to ${newStatus.toUpperCase()}`);
+    setApplications((prev) => prev.map((app) => app.id === appId ? { ...app, status: newStatus } : app));
+    triggerToast(`Application status updated to ${newStatus}.`);
   };
 
   const handleUpdateTicketStatus = (ticketId: string, newStatus: MaintenanceTicket["status"]) => {
-    setMaintenanceTickets((prev) =>
-      prev.map((t) => (t.id === ticketId ? { ...t, status: newStatus } : t))
-    );
-    triggerToast(`Ticket status updated to ${newStatus.toUpperCase()}`);
+    setMaintenanceTickets((prev) => prev.map((ticket) => ticket.id === ticketId ? { ...ticket, status: newStatus } : ticket));
+    triggerToast(`Ticket status updated to ${newStatus}.`);
   };
 
-  return (
-    <AppContext.Provider
-      value={{
-        currentRole,
-        setCurrentRole,
-        currentUser,
-        setCurrentUser,
-        userPreferences,
-        saveUserPreferences,
-        hasCompletedOnboarding,
-        properties,
-        savedPropertyIds,
-        applications,
-        leases,
-        maintenanceTickets,
-        messages,
-        isLoadingDb,
-        toastMessage,
-        triggerToast,
-        handleToggleSaveProperty,
-        handleApplySubmit,
-        handleCreateMaintenance,
-        handleSendMessage,
-        handleCreateProperty,
-        handleUpdateApplicationStatus,
-        handleUpdateTicketStatus,
-        isNotificationsOpen,
-        setIsNotificationsOpen,
-        isAuthModalOpen,
-        setIsAuthModalOpen,
-        authMode,
-        setAuthMode,
-        handleOpenAuth,
-        logout,
-      }}
-    >
-      {children}
-    </AppContext.Provider>
-  );
+  const value = useMemo<AppContextType>(() => ({
+    currentRole,
+    setCurrentRole,
+    currentUser,
+    setCurrentUser,
+    userPreferences,
+    saveUserPreferences,
+    hasCompletedOnboarding,
+    properties,
+    savedPropertyIds,
+    applications,
+    leases,
+    maintenanceTickets,
+    messages,
+    isLoadingDb,
+    toastMessage,
+    triggerToast,
+    handleToggleSaveProperty,
+    handleApplySubmit,
+    handleCreateMaintenance,
+    handleSendMessage,
+    handleCreateProperty,
+    handleUpdateApplicationStatus,
+    handleUpdateTicketStatus,
+    isNotificationsOpen,
+    setIsNotificationsOpen,
+    isAuthModalOpen,
+    setIsAuthModalOpen,
+    authMode,
+    setAuthMode,
+    handleOpenAuth,
+    logout,
+  }), [
+    currentRole, currentUser, userPreferences, hasCompletedOnboarding, properties,
+    savedPropertyIds, applications, leases, maintenanceTickets, messages,
+    isLoadingDb, toastMessage, isNotificationsOpen, isAuthModalOpen, authMode,
+  ]);
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
 
 export const useApp = () => {
