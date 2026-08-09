@@ -21,14 +21,14 @@ export function ExplorePage() {
     if (!userPreferences) return () => { active = false; };
     void fetchRecommendations(12).then((recommendations) => {
       if (!active || recommendations.length === 0) return;
-      const ranked = recommendations.map((result) => {
+      const ranked: Property[] = recommendations.map((result) => {
         const base = properties.find((property) => property.id === result.property.id);
-        return base ? { ...base, match_score: result.matchScore, match_reasons: result.reasons } : null;
+        return base ? { ...base, match_score: result.matchScore } : null;
       }).filter((property): property is Property => property !== null);
       if (ranked.length) {
         const rankedIds = new Set(ranked.map((p) => p.id));
         setFilteredProperties([...ranked, ...properties.filter((p) => !rankedIds.has(p.id))]);
-        ranked.forEach((property) => void recordAIFeedback(property.id, "impression", { matchScore: property.match_score, reasons: property.match_reasons }));
+        ranked.forEach((property) => void recordAIFeedback(property.id, "impression", { matchScore: property.match_score }));
       }
     }).catch(() => undefined);
     return () => { active = false; };
