@@ -25,6 +25,9 @@ public class PropertyEntity {
     @Column(name = "broker_id")
     private UUID brokerId;
 
+    @Column(name = "agency_id")
+    private UUID agencyId;
+
     @Column(nullable = false)
     private String title;
 
@@ -69,12 +72,22 @@ public class PropertyEntity {
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
+    @Column(name = "updated_at")
+    private OffsetDateTime updatedAt;
+
     @Column(name = "deleted_at")
     private OffsetDateTime deletedAt;
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = OffsetDateTime.now();
+        OffsetDateTime now = OffsetDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
         if (this.status == null) this.status = "available";
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = OffsetDateTime.now();
     }
 }
