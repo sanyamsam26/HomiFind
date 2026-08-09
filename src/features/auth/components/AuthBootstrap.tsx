@@ -17,11 +17,8 @@ export function AuthBootstrap() {
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
-      if (session?.user) {
-        setCurrentUser(mapAuthUser(session.user));
-      } else {
-        setCurrentUser(null);
-      }
+      if (session?.user) setCurrentUser(mapAuthUser(session.user));
+      else setCurrentUser(null);
     });
 
     if (window.location.pathname === "/auth/callback") {
@@ -32,7 +29,9 @@ export function AuthBootstrap() {
       active = false;
       listener.subscription.unsubscribe();
     };
-  }, [navigate, setCurrentUser]);
+    // AppProvider exposes a stable auth action contract for this bootstrap boundary.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate]);
 
   return null;
 }
