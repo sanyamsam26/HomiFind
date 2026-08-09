@@ -7,11 +7,9 @@ export async function authenticatedFetch(path: string, init: RequestInit = {}) {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new Error("No authenticated Supabase session.");
-
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${token}`);
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-
   const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
   if (!response.ok) {
     const message = await response.text();
@@ -23,6 +21,19 @@ export async function authenticatedFetch(path: string, init: RequestInit = {}) {
 export async function syncBackendProfile() {
   const response = await authenticatedFetch("/auth/sync", { method: "POST" });
   return response.json();
+}
+
+export async function createProperty(property: Partial<Property>): Promise<Property> {
+  const response = await authenticatedFetch("/properties", {
+    method: "POST",
+    body: JSON.stringify(property),
+  });
+  return (await response.json()) as Property;
+}
+
+export async function fetchMyProperties(): Promise<Property[]> {
+  const response = await authenticatedFetch("/properties/mine");
+  return (await response.json()) as Property[];
 }
 
 export interface RecommendationResult {
@@ -65,12 +76,7 @@ export async function fetchBrokerAssignments(): Promise<BrokerAssignment[]> {
   return (await response.json()) as BrokerAssignment[];
 }
 
-export async function assignBrokerToProperty(
-  propertyId: string,
-  brokerId: string,
-  agencyId?: string,
-  role: "agent" | "manager" = "agent"
-): Promise<BrokerAssignment> {
+export async function assignBrokerToProperty(propertyId: string, brokerId: string, agencyId?: string, role: "agent" | "manager" = "agent"): Promise<BrokerAssignment> {
   const response = await authenticatedFetch(`/broker-properties/${propertyId}/assign`, {
     method: "POST",
     body: JSON.stringify({ brokerId, agencyId: agencyId || null, role }),
