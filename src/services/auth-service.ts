@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase";
+import { syncBackendProfile } from "./backend-api";
 import type { UserRole } from "../types/database";
 
 export interface AuthUser {
@@ -31,11 +32,30 @@ export function mapAuthUser(user: {
   };
 }
 
+async function syncAuthenticatedUser(user: Parameters<typeof mapAuthUser>[0]): Promise<AuthUser> {
+  const fallback = mapAuthUser(user);
+  try {
+    const profile = await syncBackendProfile();
+    return {
+      id: String(profile.id ?? fallback.id),
+      email: String(profile.email ?? fallback.email),
+      name: String(profile.name ?? fallback.name),
+      role: (profile.role === "owner" || profile.role === "broker" || profile.role === "renter")
+        ? profile.role
+        : fallback.role,
+      verified: Boolean(profile.verified ?? fallback.verified),
+    };
+  } catch {
+    // Auth must remain usable if the API is temporarily unavailable.
+    return fallback;
+  }
+}
+
 export async function signInWithPassword(email: string, password: string): Promise<AuthUser> {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
   if (!data.user) throw new Error("Authentication succeeded but no user was returned.");
-  return mapAuthUser(data.user);
+  return syncAuthenticatedUser(data.user);
 }
 
 export async function signUpWithPassword(
@@ -47,7 +67,7 @@ export async function signUpWithPassword(
     email,
     password,
     options: {
-      data: { full_name: fullName, role: "renter" },
+      data: { full_name: fullName },
     },
   });
 
@@ -72,7 +92,7 @@ export async function signInWithGoogle() {
 export async function getSessionUser(): Promise<AuthUser | null> {
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) return null;
-  return mapAuthUser(data.user);
+  return syncAuthenticatedUser(data.user);
 }
 
 export async function signOut() {
