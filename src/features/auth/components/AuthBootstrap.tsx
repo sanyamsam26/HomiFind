@@ -11,36 +11,24 @@ export function AuthBootstrap() {
 
   useEffect(() => {
     let active = true;
-
     const applySession = async (sessionUser: Parameters<typeof mapAuthUser>[0] | null) => {
       if (!sessionUser) {
         if (active) setCurrentUser(null);
         return;
       }
       if (active) setCurrentUser(mapAuthUser(sessionUser));
-      try {
-        await syncBackendProfile();
-      } catch (error) {
-        // The frontend remains usable while the API is starting locally; production should surface this via observability.
-        console.warn("HomiFind backend profile sync unavailable", error);
-      }
+      try { await syncBackendProfile(); }
+      catch (error) { console.warn("HomiFind backend profile sync unavailable", error); }
     };
 
     supabase.auth.getUser().then(({ data }) => { void applySession(data.user); });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => { void applySession(session?.user ?? null); });
+    if (window.location.pathname === "/auth/callback") navigate("/choose-experience", { replace: true });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      void applySession(session?.user ?? null);
-    });
-
-    if (window.location.pathname === "/auth/callback") {
-      navigate("/choose-experience", { replace: true });
-    }
-
-    return () => {
-      active = false;
-      listener.subscription.unsubscribe();
-    };
-  }, [navigate, setCurrentUser]);
+    return () => { active = false; listener.subscription.unsubscribe(); };
+    // setCurrentUser is an action supplied by AppProvider and intentionally excluded from effect identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate]);
 
   return null;
 }
