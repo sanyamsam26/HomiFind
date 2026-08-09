@@ -61,7 +61,7 @@ export async function signUpWithPassword(
   fullName: string,
   email: string,
   password: string,
-  role: UserRole,
+  role: UserRole = "renter",
   phone?: string,
   licenseNumber?: string,
 ): Promise<{ user: AuthUser | null; needsEmailConfirmation: boolean }> {
