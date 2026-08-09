@@ -1,18 +1,20 @@
-# HomiFind
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+</div>
 
-AI-powered property discovery and listing platform.
+# Run and deploy your AI Studio app
 
-This repository is being established as the source of truth for the HomiFind application. The current application was generated in Google AI Studio and is being migrated toward a production architecture using React/Vite, Spring Boot, and Supabase.
+This contains everything you need to run your app locally.
 
-## Architecture direction
+View your app in AI Studio: https://ai.studio/apps/d22b7b6c-0f45-4a32-bdd6-4a98d967ab9b
 
-- Frontend: React + Vite
-- Backend: Spring Boot REST APIs
-- Data/Auth/Storage: Supabase
-- AI: backend-orchestrated AI services
+## Run Locally
 
-## Development branches
+**Prerequisites:**  Node.js
 
-- `main` — stable releases
-- `develop` — integration
-- `architecture-v2` — architecture migration
+
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`

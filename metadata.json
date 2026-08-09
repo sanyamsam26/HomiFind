@@ -1,0 +1,6 @@
+{
+  "name": "HomiFind",
+  "description": "AI-powered property platform supporting multi-role workspaces for renters, owners, and brokers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
