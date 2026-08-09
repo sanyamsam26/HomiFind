@@ -24,6 +24,7 @@ spring:
         jwt:
           issuer-uri: ${SUPABASE_ISSUER_URI:https://myskqtyhoinngdslgccd.supabase.co/auth/v1}
           jwk-set-uri: ${SUPABASE_JWK_SET_URI:https://myskqtyhoinngdslgccd.supabase.co/auth/v1/.well-known/jwks.json}
+          jws-algorithms: ES256
 
 homifind:
   ai:
