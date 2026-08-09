@@ -41,7 +41,6 @@ public class PropertyController {
         property.setOwnerId(ownerId);
         property.setBrokerId(null);
         property.setStatus("under_review");
-        property.setAiProcessingStatus("pending");
         PropertyEntity saved = propertyRepository.save(property);
         propertyAiProcessingService.processAsync(saved.getId());
         return ResponseEntity.ok(saved);
