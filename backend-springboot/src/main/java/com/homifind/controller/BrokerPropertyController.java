@@ -25,22 +25,18 @@ public class BrokerPropertyController {
         return brokerPropertyService.listForBroker(userId(authentication));
     }
 
+    @GetMapping("/available-brokers")
+    public List<Map<String, Object>> availableBrokers() {
+        return brokerPropertyService.availableBrokers();
+    }
+
     @PostMapping("/{propertyId}/assign")
-    public Map<String, Object> assign(
-        JwtAuthenticationToken authentication,
-        @PathVariable UUID propertyId,
-        @RequestBody AssignmentRequest request
-    ) {
-        return brokerPropertyService.assign(
-            userId(authentication), propertyId, request.brokerId(), request.agencyId(), request.role()
-        );
+    public Map<String, Object> assign(JwtAuthenticationToken authentication, @PathVariable UUID propertyId, @RequestBody AssignmentRequest request) {
+        return brokerPropertyService.assign(userId(authentication), propertyId, request.brokerId(), request.agencyId(), request.role());
     }
 
     @PostMapping("/assignments/{assignmentId}/revoke")
-    public Map<String, Object> revoke(
-        JwtAuthenticationToken authentication,
-        @PathVariable UUID assignmentId
-    ) {
+    public Map<String, Object> revoke(JwtAuthenticationToken authentication, @PathVariable UUID assignmentId) {
         brokerPropertyService.revoke(userId(authentication), assignmentId);
         return Map.of("status", "revoked", "assignmentId", assignmentId);
     }
