@@ -49,7 +49,9 @@ public class PropertyEntity {
     private Boolean utilitiesIncluded;
 
     private Integer bedrooms;
-    private Double bathrooms;
+
+    @Column(name = "bathrooms", precision = 3, scale = 1)
+    private BigDecimal bathrooms;
 
     @Column(name = "square_feet")
     private Integer squareFeet;
@@ -74,9 +76,6 @@ public class PropertyEntity {
 
     @Column(nullable = false)
     private String country;
-
-    @Column(name = "primary_image_url")
-    private String primaryImageUrl;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
