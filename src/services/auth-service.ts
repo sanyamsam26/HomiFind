@@ -46,13 +46,12 @@ async function syncAuthenticatedUser(user: Parameters<typeof mapAuthUser>[0]): P
       verified: Boolean(profile.verified ?? fallback.verified),
     };
   } catch {
-    // Auth must remain usable if the API is temporarily unavailable.
     return fallback;
   }
 }
 
 export async function signInWithPassword(email: string, password: string): Promise<AuthUser> {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
   if (error) throw error;
   if (!data.user) throw new Error("Authentication succeeded but no user was returned.");
   return syncAuthenticatedUser(data.user);
@@ -61,13 +60,21 @@ export async function signInWithPassword(email: string, password: string): Promi
 export async function signUpWithPassword(
   fullName: string,
   email: string,
-  password: string
+  password: string,
+  role: UserRole,
+  phone?: string,
+  licenseNumber?: string,
 ): Promise<{ user: AuthUser | null; needsEmailConfirmation: boolean }> {
   const { data, error } = await supabase.auth.signUp({
-    email,
+    email: email.trim(),
     password,
     options: {
-      data: { full_name: fullName },
+      data: {
+        full_name: fullName.trim(),
+        role,
+        phone: phone?.trim() || null,
+        license_number: role === "broker" ? licenseNumber?.trim() || null : null,
+      },
     },
   });
 
@@ -82,9 +89,7 @@ export async function signUpWithPassword(
 export async function signInWithGoogle() {
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
-    },
+    options: { redirectTo: `${window.location.origin}/auth/callback` },
   });
   if (error) throw error;
 }
