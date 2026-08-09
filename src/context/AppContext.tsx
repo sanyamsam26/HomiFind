@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 import { UserRole, Property, Application, Lease, MaintenanceTicket, Message, UserPreferences } from "../types/database";
 import { INITIAL_PROPERTIES, MOCK_APPLICATIONS, MOCK_LEASES, MOCK_MAINTENANCE_TICKETS, MOCK_MESSAGES } from "../data/mock-properties";
 import { dbService } from "../services/api";
-import { getSessionUser, signOut as signOutSupabase } from "../services/auth-service";
+import { signOut as signOutSupabase } from "../services/auth-service";
 
 export interface UserProfile { id: string; name: string; email: string; role: UserRole; verified: boolean; }
 interface AppContextType {
@@ -50,20 +50,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentStateUser(user);
     if (!user) { localStorage.removeItem("homifind_active_user"); localStorage.removeItem("homifind_active_workspace"); setCurrentRoleState("renter"); }
   };
-
-  // Supabase is the source of truth for authentication. Do not hydrate a user from localStorage.
-  useEffect(() => {
-    let cancelled = false;
-    const hydrateSession = async () => {
-      try {
-        const user = await getSessionUser();
-        if (!cancelled) setCurrentStateUser(user as UserProfile | null);
-      } catch (error) { console.error("Failed to restore Supabase session", error); if (!cancelled) setCurrentStateUser(null); }
-      finally { if (!cancelled) setIsLoadingDb(false); }
-    };
-    void hydrateSession();
-    return () => { cancelled = true; };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
