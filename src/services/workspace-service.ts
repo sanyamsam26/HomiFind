@@ -27,11 +27,13 @@ export async function enableWorkspace(workspace: UserRole): Promise<WorkspaceRec
   }
 
   const userId = await getCurrentUserId();
-  const response = await authenticatedFetch(`/workspaces/${userId}`, {
+  await authenticatedFetch(`/workspaces/${userId}`, {
     method: "POST",
     body: JSON.stringify({ workspace: workspace.toUpperCase() }),
   });
-  return (await response.json()) as WorkspaceRecord;
+
+  // The POST succeeded; navigation must not depend on parsing the response body.
+  return { workspace, is_active: true };
 }
 
 export function workspaceHome(workspace: UserRole): string {
