@@ -1,21 +1,14 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { useApp } from "../../context/AppContext";
-import { PropertyUploadWizard } from "../../components/property-upload-wizard";
+import { DynamicPropertyWizard } from "../../components/dynamic-property-wizard";
+import { createProperty } from "../../services/backend-api";
 
 export function NewPropertyPage() {
-  const { handleCreateProperty } = useApp();
   const navigate = useNavigate();
-
   return (
-    <PropertyUploadWizard
-      isOpen={true}
+    <DynamicPropertyWizard
       onClose={() => navigate("/owner/properties")}
-      onPublish={(newProp) => {
-        handleCreateProperty(newProp);
-        navigate("/owner/properties");
-      }}
-      onGoToDashboard={() => navigate("/owner/dashboard")}
+      onSubmit={(property) => createProperty(property)}
     />
   );
 }
