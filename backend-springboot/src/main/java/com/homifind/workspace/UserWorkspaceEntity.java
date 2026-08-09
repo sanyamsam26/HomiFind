@@ -1,11 +1,14 @@
 package com.homifind.workspace;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -26,8 +29,9 @@ public class UserWorkspaceEntity {
     private UUID userId;
 
     @Id
-    @Convert(converter = WorkspaceTypeConverter.class)
-    @Column(name = "workspace", nullable = false)
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "workspace", nullable = false, columnDefinition = "user_role")
     private WorkspaceType workspace;
 
     @Column(name = "is_active", nullable = false)
