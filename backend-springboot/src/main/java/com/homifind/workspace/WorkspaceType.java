@@ -5,14 +5,17 @@ import com.fasterxml.jackson.annotation.JsonValue;
 
 import java.util.Locale;
 
+/**
+ * Values intentionally match the PostgreSQL public.user_role enum exactly.
+ */
 public enum WorkspaceType {
-    RENTER,
-    OWNER,
-    BROKER;
+    renter,
+    owner,
+    broker;
 
     @JsonValue
     public String toJson() {
-        return name().toLowerCase(Locale.ROOT);
+        return name();
     }
 
     @JsonCreator
@@ -20,6 +23,6 @@ public enum WorkspaceType {
         if (value == null) {
             return null;
         }
-        return valueOf(value.trim().toUpperCase(Locale.ROOT));
+        return valueOf(value.trim().toLowerCase(Locale.ROOT));
     }
 }
