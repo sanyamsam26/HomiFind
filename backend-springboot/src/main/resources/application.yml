@@ -25,6 +25,11 @@ spring:
           issuer-uri: ${SUPABASE_ISSUER_URI:https://myskqtyhoinngdslgccd.supabase.co/auth/v1}
           jwk-set-uri: ${SUPABASE_JWK_SET_URI:https://myskqtyhoinngdslgccd.supabase.co/auth/v1/.well-known/jwks.json}
 
+homifind:
+  ai:
+    function-url: ${HOMIFIND_AI_FUNCTION_URL:}
+    internal-token: ${HOMIFIND_AI_INTERNAL_TOKEN:}
+
 management:
   endpoints:
     web:
