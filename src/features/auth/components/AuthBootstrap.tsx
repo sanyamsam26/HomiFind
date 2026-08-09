@@ -1,34 +1,67 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useApp } from "../../../context/AppContext";
-import { mapAuthUser } from "../../../services/auth-service";
-import { syncBackendProfile } from "../../../services/backend-api";
+import { getSessionUser, mapAuthUser } from "../../../services/auth-service";
 import { supabase } from "../../../lib/supabase";
+import { listWorkspaces, workspaceHome } from "../../../services/workspace-service";
 
 export function AuthBootstrap() {
   const { setCurrentUser } = useApp();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     let active = true;
-    const applySession = async (sessionUser: Parameters<typeof mapAuthUser>[0] | null) => {
+    let redirecting = false;
+
+    const applyUser = async (sessionUser: Parameters<typeof mapAuthUser>[0] | null) => {
       if (!sessionUser) {
         if (active) setCurrentUser(null);
         return;
       }
-      if (active) setCurrentUser(mapAuthUser(sessionUser));
-      try { await syncBackendProfile(); }
-      catch (error) { console.warn("HomiFind backend profile sync unavailable", error); }
+
+      const user = await getSessionUser();
+      if (!active) return;
+      setCurrentUser(user ?? mapAuthUser(sessionUser));
     };
 
-    supabase.auth.getUser().then(({ data }) => { void applySession(data.user); });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => { void applySession(session?.user ?? null); });
-    if (window.location.pathname === "/auth/callback") navigate("/choose-experience", { replace: true });
+    const bootstrap = async () => {
+      const { data } = await supabase.auth.getSession();
+      await applyUser(data.session?.user ?? null);
 
-    return () => { active = false; listener.subscription.unsubscribe(); };
-    // setCurrentUser is an action supplied by AppProvider and intentionally excluded from effect identity.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate]);
+      if (!active || !data.session || location.pathname !== "/auth/callback" || redirecting) return;
+      redirecting = true;
+
+      try {
+        const workspaces = await listWorkspaces();
+        const enabled = workspaces.filter((item) => item.is_active).map((item) => item.workspace);
+        if (enabled.length === 0) {
+          navigate("/choose-experience", { replace: true });
+        } else {
+          const preferred = enabled.includes("renter") ? "renter" : enabled[0];
+          navigate(workspaceHome(preferred), { replace: true });
+        }
+      } catch {
+        navigate("/choose-experience", { replace: true });
+      }
+    };
+
+    void bootstrap();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      // Supabase can emit INITIAL_SESSION before bootstrap finishes; don't navigate twice.
+      if (event === "SIGNED_OUT") {
+        if (active) setCurrentUser(null);
+        return;
+      }
+      void applyUser(session?.user ?? null);
+    });
+
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
+  }, [location.pathname, navigate, setCurrentUser]);
 
   return null;
 }
