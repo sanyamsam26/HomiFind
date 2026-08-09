@@ -5,6 +5,9 @@ export type PropertyType =
   | "house"
   | "condo"
   | "townhouse"
+  | "private_room"
+  | "pg"
+  | "hostel"
   | "studio"
   | "commercial"
   | "villa"
@@ -99,7 +102,7 @@ export interface Property {
   longitude?: number;
   featured: boolean;
   view_count: number;
-  match_score?: number; // Calculated for AI semantic search
+  match_score?: number;
   primary_image_url?: string;
   created_at: string;
   updated_at: string;
