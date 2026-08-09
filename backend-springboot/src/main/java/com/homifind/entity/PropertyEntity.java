@@ -63,8 +63,17 @@ public class PropertyEntity {
     @Column(name = "address_line1", nullable = false)
     private String addressLine1;
 
+    @Column(name = "zip_code", nullable = false)
+    private String zipCode;
+
+    @Column(nullable = false)
     private String city;
+
+    @Column(nullable = false)
     private String state;
+
+    @Column(nullable = false)
+    private String country;
 
     @Column(name = "primary_image_url")
     private String primaryImageUrl;
@@ -84,6 +93,7 @@ public class PropertyEntity {
         this.createdAt = now;
         this.updatedAt = now;
         if (this.status == null) this.status = "available";
+        if (this.country == null) this.country = "India";
     }
 
     @PreUpdate
