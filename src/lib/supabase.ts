@@ -1,10 +1,16 @@
 import { createClient } from "@supabase/supabase-js";
 
-const env = (import.meta as any).env || {};
-const SUPABASE_URL = env.VITE_SUPABASE_URL || "https://myskqtyhoinngdslgccd.supabase.co";
-const SUPABASE_ANON_KEY =
-  env.VITE_SUPABASE_ANON_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15c2txdHlob2lubmdkc2xnY2NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyNjk4ODIsImV4cCI6MjEwMTg0NTg4Mn0.HcIvxtDwuUS_luLNpRjLcmouC01I9JjeEj_WJq0XoPk";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.warn(
+    "HomiFind: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are required for authentication. " +
+      "Configure them in your local .env file."
+  );
+}
 
+export const supabase = createClient(
+  SUPABASE_URL || "https://placeholder.supabase.co",
+  SUPABASE_ANON_KEY || "placeholder-anon-key"
+);
