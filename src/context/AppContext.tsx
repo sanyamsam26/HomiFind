@@ -33,7 +33,7 @@ interface AppContextType {
   handleApplySubmit: (property: Property, formData: any) => void;
   handleCreateMaintenance: (ticketData: any) => void;
   handleSendMessage: (text: string) => void;
-  handleCreateProperty: (newProp: Partial<Property>) => void;
+  handleCreateProperty: (newProp: Partial<Property>) => Promise<boolean>;
   handleUpdateApplicationStatus: (appId: string, newStatus: Application["status"]) => void;
   handleUpdateTicketStatus: (ticketId: string, newStatus: MaintenanceTicket["status"]) => void;
   isNotificationsOpen: boolean;
@@ -52,9 +52,7 @@ function readStoredUser(): UserProfile | null {
   try {
     const saved = localStorage.getItem("homifind_active_user");
     return saved ? JSON.parse(saved) : null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 function readStoredRole(): UserRole {
@@ -112,9 +110,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!currentUser?.id) { setProperties(INITIAL_PROPERTIES); return; }
       setIsLoadingDb(true);
       try {
-        const fetchedProps = await dbService.fetchProperties();
-        const rawProps = fetchedProps.length > 0 ? fetchedProps : INITIAL_PROPERTIES;
-        const personalized = await dbService.fetchPersonalizedProperties(currentUser.id, userPreferences, rawProps);
+        const fetchedProps = currentRole === "owner" ? await dbService.fetchMyProperties() : await dbService.fetchProperties();
+        const rawProps = currentRole === "owner" ? fetchedProps : (fetchedProps.length > 0 ? fetchedProps : INITIAL_PROPERTIES);
+        const personalized = currentRole === "owner" ? rawProps : await dbService.fetchPersonalizedProperties(currentUser.id, userPreferences, rawProps);
         const fetchedApps = await dbService.fetchApplications();
         if (!cancelled) {
           setProperties(personalized);
@@ -128,7 +126,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     void syncDatabaseData();
     return () => { cancelled = true; };
-  }, [currentUser?.id, userPreferences]);
+  }, [currentUser?.id, currentRole, userPreferences]);
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
@@ -145,20 +143,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const hasCompletedOnboarding = Boolean(userPreferences?.hasCompletedOnboarding || userPreferences?.profileType);
-
   const handleOpenAuth = (mode: "signup" | "signin" = "signup") => { setAuthMode(mode); setIsAuthModalOpen(true); };
 
   const logout = async () => {
-    try {
-      await signOutSupabase();
-      triggerToast("Signed out successfully");
-    } catch (error) {
-      console.error("Supabase sign-out failed", error);
-      triggerToast("Unable to sign out. Please try again.");
-    } finally {
-      setCurrentUser(null);
-      setUserPreferences(null);
-    }
+    try { await signOutSupabase(); triggerToast("Signed out successfully"); }
+    catch (error) { console.error("Supabase sign-out failed", error); triggerToast("Unable to sign out. Please try again."); }
+    finally { setCurrentUser(null); setUserPreferences(null); }
   };
 
   const handleToggleSaveProperty = (id: string) => setSavedPropertyIds((prev) => prev.includes(id) ? prev.filter((propertyId) => propertyId !== id) : [...prev, id]);
@@ -169,8 +159,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `app-${Date.now()}`, property_id: property.id, renter_id: currentUser?.id || "", status: "submitted",
       proposed_move_in_date: formData.moveInDate, occupants_count: Number(formData.occupants) || 1,
       annual_income: Number(formData.income) || 0, employment_status: formData.employment || "not_provided",
-      has_pets: Boolean(formData.hasPets), background_check_consent: Boolean(formData.backgroundCheckConsent),
-      document_paths: [], notes: "Submitted via HomiFind", created_at: now, updated_at: now, property,
+      has_pets: Boolean(formData.hasPets), background_check_consent: Boolean(formData.backgroundCheckConsent), document_paths: [],
+      notes: "Submitted via HomiFind", created_at: now, updated_at: now, property,
     };
     setApplications((prev) => [newApp, ...prev]); triggerToast(`Application submitted for ${property.title}.`);
   };
@@ -178,10 +168,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const handleCreateMaintenance = (ticketData: any) => {
     const now = new Date().toISOString();
     const newTicket: MaintenanceTicket = {
-      id: `maint-${Date.now()}`, property_id: ticketData.property_id, renter_id: currentUser?.id || "",
-      title: ticketData.title, description: ticketData.description, priority: ticketData.priority, status: "open",
-      attachment_paths: [], created_at: now, updated_at: now,
-      property: properties.find((property) => property.id === ticketData.property_id),
+      id: `maint-${Date.now()}`, property_id: ticketData.property_id, renter_id: currentUser?.id || "", title: ticketData.title,
+      description: ticketData.description, priority: ticketData.priority, status: "open", attachment_paths: [], created_at: now,
+      updated_at: now, property: properties.find((property) => property.id === ticketData.property_id),
     };
     setMaintenanceTickets((prev) => [newTicket, ...prev]); triggerToast("Maintenance request created.");
   };
@@ -192,20 +181,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMessages((prev) => [...prev, newMsg]);
   };
 
-  const handleCreateProperty = (newProp: Partial<Property>) => {
-    const now = new Date().toISOString();
-    const fullProp: Property = {
-      id: `prop-${Date.now()}`, title: newProp.title || "New Property Unit", description: newProp.description || "",
-      property_type: newProp.property_type || "apartment", status: "available", rent_price: newProp.rent_price || 0,
-      deposit_amount: newProp.deposit_amount || 0, utilities_included: newProp.utilities_included ?? false,
-      bedrooms: newProp.bedrooms || 0, bathrooms: newProp.bathrooms || 0, square_feet: newProp.square_feet,
-      is_pet_friendly: newProp.is_pet_friendly ?? false, is_furnished: newProp.is_furnished ?? false,
-      amenities: newProp.amenities || [], address_line1: newProp.address_line1 || "", city: newProp.city || "",
-      state: newProp.state || "", zip_code: newProp.zip_code || "", country: newProp.country || "India",
-      featured: false, view_count: 0, primary_image_url: newProp.primary_image_url, owner_id: currentUser?.id || "",
-      created_at: now, updated_at: now,
-    };
-    setProperties((prev) => [fullProp, ...prev]); triggerToast(`Listing created: ${fullProp.title}`);
+  const handleCreateProperty = async (newProp: Partial<Property>): Promise<boolean> => {
+    if (!currentUser?.id) { triggerToast("Please sign in before creating a listing."); return false; }
+    setIsLoadingDb(true);
+    try {
+      const created = await dbService.createProperty(newProp);
+      if (!created) { triggerToast("Unable to create listing. Please try again."); return false; }
+      setProperties((prev) => [created, ...prev]);
+      triggerToast(`Listing submitted for verification: ${created.title}`);
+      return true;
+    } finally { setIsLoadingDb(false); }
   };
 
   const handleUpdateApplicationStatus = (appId: string, newStatus: Application["status"]) => {
@@ -219,12 +204,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const value = useMemo<AppContextType>(() => ({
-    currentRole, setCurrentRole, currentUser, setCurrentUser, userPreferences, saveUserPreferences,
-    hasCompletedOnboarding, properties, savedPropertyIds, applications, leases, maintenanceTickets, messages,
-    isLoadingDb, toastMessage, triggerToast, handleToggleSaveProperty, handleApplySubmit, handleCreateMaintenance,
-    handleSendMessage, handleCreateProperty, handleUpdateApplicationStatus, handleUpdateTicketStatus,
-    isNotificationsOpen, setIsNotificationsOpen, isAuthModalOpen, setIsAuthModalOpen, authMode, setAuthMode,
-    handleOpenAuth, logout,
+    currentRole, setCurrentRole, currentUser, setCurrentUser, userPreferences, saveUserPreferences, hasCompletedOnboarding,
+    properties, savedPropertyIds, applications, leases, maintenanceTickets, messages, isLoadingDb, toastMessage, triggerToast,
+    handleToggleSaveProperty, handleApplySubmit, handleCreateMaintenance, handleSendMessage, handleCreateProperty,
+    handleUpdateApplicationStatus, handleUpdateTicketStatus, isNotificationsOpen, setIsNotificationsOpen, isAuthModalOpen,
+    setIsAuthModalOpen, authMode, setAuthMode, handleOpenAuth, logout,
   }), [currentRole, currentUser, userPreferences, hasCompletedOnboarding, properties, savedPropertyIds, applications, leases,
       maintenanceTickets, messages, isLoadingDb, toastMessage, isNotificationsOpen, isAuthModalOpen, authMode]);
 
