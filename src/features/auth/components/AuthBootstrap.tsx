@@ -19,10 +19,8 @@ export function AuthBootstrap() {
         if (active) setCurrentUser(null);
         return;
       }
-
       const user = await getSessionUser();
-      if (!active) return;
-      setCurrentUser(user ?? mapAuthUser(sessionUser));
+      if (active) setCurrentUser(user ?? mapAuthUser(sessionUser));
     };
 
     const bootstrap = async () => {
@@ -31,25 +29,17 @@ export function AuthBootstrap() {
 
       if (!active || !data.session || location.pathname !== "/auth/callback" || redirecting) return;
       redirecting = true;
-
       try {
-        const workspaces = await listWorkspaces();
-        const enabled = workspaces.filter((item) => item.is_active).map((item) => item.workspace);
-        if (enabled.length === 0) {
-          navigate("/choose-experience", { replace: true });
-        } else {
-          const preferred = enabled.includes("renter") ? "renter" : enabled[0];
-          navigate(workspaceHome(preferred), { replace: true });
-        }
+        const enabled = (await listWorkspaces()).filter((item) => item.is_active).map((item) => item.workspace);
+        const preferred = enabled.includes("renter") ? "renter" : enabled[0];
+        navigate(preferred ? workspaceHome(preferred) : "/choose-experience", { replace: true });
       } catch {
         navigate("/choose-experience", { replace: true });
       }
     };
 
     void bootstrap();
-
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      // Supabase can emit INITIAL_SESSION before bootstrap finishes; don't navigate twice.
       if (event === "SIGNED_OUT") {
         if (active) setCurrentUser(null);
         return;
@@ -61,7 +51,9 @@ export function AuthBootstrap() {
       active = false;
       listener.subscription.unsubscribe();
     };
-  }, [location.pathname, navigate, setCurrentUser]);
+    // setCurrentUser is a stable context action for this bootstrap lifecycle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, navigate]);
 
   return null;
 }
