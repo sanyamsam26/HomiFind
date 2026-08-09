@@ -1,6 +1,7 @@
 import React from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppProvider } from "./context/AppContext";
+import { AuthBootstrap } from "./features/auth/components/AuthBootstrap";
 import { PublicLayout } from "./layouts/PublicLayout";
 import { AuthLayout } from "./layouts/AuthLayout";
 import { DashboardLayout } from "./layouts/DashboardLayout";
@@ -49,28 +50,26 @@ export default function App() {
   return (
     <AppProvider>
       <BrowserRouter>
+        <AuthBootstrap />
         <Routes>
           <Route path="/" element={<Navigate to="/discover" replace />} />
-
           <Route element={<PublicLayout />}>
             <Route path="/discover" element={<HomePage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/pricing" element={<PricingPage />} />
             <Route path="/contact" element={<ContactPage />} />
           </Route>
-
           <Route element={<AuthLayout />}>
             <Route path="/auth/login" element={<LoginPage />} />
             <Route path="/auth/signup" element={<SignupPage />} />
             <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/auth/callback" element={<LoadingPage />} />
           </Route>
-
           <Route element={<ProtectedLayout />}>
             <Route path="/choose-experience" element={<ExperienceSelectionPage />} />
             <Route path="/onboarding" element={<Navigate to="/choose-experience" replace />} />
             <Route path="/app/onboarding" element={<OnboardingPage />} />
           </Route>
-
           <Route element={<ProtectedLayout requiredRole="renter" />}>
             <Route element={<DashboardLayout />}>
               <Route path="/app" element={<Navigate to="/app/explore" replace />} />
@@ -86,7 +85,6 @@ export default function App() {
               <Route path="/app/profile" element={<ProfilePage />} />
             </Route>
           </Route>
-
           <Route element={<ProtectedLayout requiredRole="owner" />}>
             <Route element={<DashboardLayout />}>
               <Route path="/owner" element={<Navigate to="/owner/dashboard" replace />} />
@@ -105,7 +103,6 @@ export default function App() {
               <Route path="/owner/subscription" element={<OwnerSubscriptionPage />} />
             </Route>
           </Route>
-
           <Route element={<ProtectedLayout requiredRole="broker" />}>
             <Route element={<DashboardLayout />}>
               <Route path="/broker" element={<Navigate to="/broker/overview" replace />} />
@@ -115,7 +112,6 @@ export default function App() {
               <Route path="/broker/messages" element={<BrokerMessagesPage />} />
             </Route>
           </Route>
-
           <Route path="/loading" element={<LoadingPage />} />
           <Route path="/error" element={<ErrorPage />} />
           <Route path="*" element={<NotFoundPage />} />
