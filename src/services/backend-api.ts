@@ -35,3 +35,49 @@ export async function fetchRecommendations(limit = 12): Promise<RecommendationRe
   const response = await authenticatedFetch(`/recommendations?limit=${limit}`);
   return (await response.json()) as RecommendationResult[];
 }
+
+export interface BrokerAssignment {
+  id: string;
+  property_id: string;
+  owner_id: string;
+  broker_id: string;
+  agency_id?: string | null;
+  role_in_listing: "agent" | "manager";
+  status: "pending" | "active" | "revoked";
+  permissions: Record<string, boolean>;
+  assigned_at: string;
+  broker_name?: string;
+  broker_email?: string;
+  owner_name?: string;
+  owner_email?: string;
+  property_title?: string;
+  city?: string;
+  property_status?: string;
+}
+
+export async function fetchOwnerBrokerAssignments(): Promise<BrokerAssignment[]> {
+  const response = await authenticatedFetch("/broker-properties/owner");
+  return (await response.json()) as BrokerAssignment[];
+}
+
+export async function fetchBrokerAssignments(): Promise<BrokerAssignment[]> {
+  const response = await authenticatedFetch("/broker-properties/broker");
+  return (await response.json()) as BrokerAssignment[];
+}
+
+export async function assignBrokerToProperty(
+  propertyId: string,
+  brokerId: string,
+  agencyId?: string,
+  role: "agent" | "manager" = "agent"
+): Promise<BrokerAssignment> {
+  const response = await authenticatedFetch(`/broker-properties/${propertyId}/assign`, {
+    method: "POST",
+    body: JSON.stringify({ brokerId, agencyId: agencyId || null, role }),
+  });
+  return (await response.json()) as BrokerAssignment;
+}
+
+export async function revokeBrokerAssignment(assignmentId: string): Promise<void> {
+  await authenticatedFetch(`/broker-properties/assignments/${assignmentId}/revoke`, { method: "POST" });
+}
