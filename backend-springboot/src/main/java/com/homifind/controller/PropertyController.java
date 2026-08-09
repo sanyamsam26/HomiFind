@@ -37,9 +37,8 @@ public class PropertyController {
         UUID ownerId = UUID.fromString(authentication.getToken().getSubject());
         property.setId(null);
         property.setOwnerId(ownerId);
-        // A broker assignment is created separately through /broker-properties.
-        // Never allow a client request to silently transfer ownership.
         property.setBrokerId(null);
+        property.setStatus("under_review");
         return ResponseEntity.ok(propertyRepository.save(property));
     }
 
