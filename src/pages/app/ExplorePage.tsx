@@ -5,7 +5,8 @@ import { AISearchBar } from "../../components/ai-search-bar";
 import { PropertyCard } from "../../components/property-card";
 import { ScheduleVisitModal } from "../../components/schedule-visit-modal";
 import { Property } from "../../types/database";
-import { Sparkles, SlidersHorizontal, MapPin } from "lucide-react";
+import { fetchRecommendations } from "../../services/backend-api";
+import { Sparkles, SlidersHorizontal } from "lucide-react";
 
 export function ExplorePage() {
   const { properties, userPreferences, savedPropertyIds, handleToggleSaveProperty } = useApp();
@@ -16,8 +17,37 @@ export function ExplorePage() {
   const [visitProperty, setVisitProperty] = useState<Property | null>(null);
 
   useEffect(() => {
+    let active = true;
     setFilteredProperties(properties);
-  }, [properties]);
+
+    if (!userPreferences) return () => { active = false; };
+
+    void fetchRecommendations(12)
+      .then((recommendations) => {
+        if (!active || recommendations.length === 0) return;
+
+        const ranked: Property[] = recommendations
+          .map((result) => {
+            const base = properties.find((property) => property.id === result.property.id);
+            if (!base) return null;
+            return { ...base, match_score: result.matchScore };
+          })
+          .filter((property): property is Property => property !== null);
+
+        if (ranked.length > 0) {
+          const rankedIds = new Set(ranked.map((property) => property.id));
+          setFilteredProperties([
+            ...ranked,
+            ...properties.filter((property) => !rankedIds.has(property.id)),
+          ]);
+        }
+      })
+      .catch(() => {
+        // The frontend Supabase-based ranking remains the resilient fallback.
+      });
+
+    return () => { active = false; };
+  }, [properties, userPreferences]);
 
   const handleAISearch = (filters: { query: string; minPrice?: number; maxPrice?: number; bedrooms?: number; city?: string }) => {
     setIsSearching(true);
@@ -37,7 +67,6 @@ export function ExplorePage() {
 
   return (
     <div className="space-y-6">
-      {/* Schedule Visit Modal */}
       {visitProperty && (
         <ScheduleVisitModal
           isOpen={!!visitProperty}
@@ -49,7 +78,6 @@ export function ExplorePage() {
         />
       )}
 
-      {/* Active AI Search Persona Banner */}
       {userPreferences && (
         <div className="bg-[#1b206b] text-white p-4.5 rounded-2xl shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border border-indigo-900">
           <div className="flex items-center space-x-3.5">
@@ -69,7 +97,7 @@ export function ExplorePage() {
             </div>
           </div>
           <button
-            onClick={() => navigate("/onboarding?force=true")}
+            onClick={() => navigate("/app/onboarding?force=true")}
             className="px-3.5 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-xs font-semibold text-white transition-all shrink-0 cursor-pointer flex items-center space-x-1.5"
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
@@ -78,15 +106,14 @@ export function ExplorePage() {
         </div>
       )}
 
-      {/* AI Search Header */}
       <AISearchBar onSearch={handleAISearch} />
 
-      {/* Active Listings Grid */}
       <div className="flex items-center justify-between pt-2">
         <div>
           <h3 className="text-xl font-bold text-slate-900">Recommended AI Property Matches</h3>
           <p className="text-xs text-slate-500">
             Showing {filteredProperties.length} verified listings tailored dynamically to your preferences
+            {isSearching ? " • Searching…" : ""}
           </p>
         </div>
       </div>
