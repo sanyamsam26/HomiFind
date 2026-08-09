@@ -2,6 +2,7 @@ package com.homifind.controller;
 
 import com.homifind.entity.PropertyEntity;
 import com.homifind.repository.PropertyRepository;
+import com.homifind.service.PropertyAiProcessingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -15,6 +16,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PropertyController {
     private final PropertyRepository propertyRepository;
+    private final PropertyAiProcessingService propertyAiProcessingService;
 
     @GetMapping
     public ResponseEntity<List<PropertyEntity>> getAllAvailableProperties() {
@@ -39,7 +41,10 @@ public class PropertyController {
         property.setOwnerId(ownerId);
         property.setBrokerId(null);
         property.setStatus("under_review");
-        return ResponseEntity.ok(propertyRepository.save(property));
+        property.setAiProcessingStatus("pending");
+        PropertyEntity saved = propertyRepository.save(property);
+        propertyAiProcessingService.processAsync(saved.getId());
+        return ResponseEntity.ok(saved);
     }
 
     @GetMapping("/mine")
