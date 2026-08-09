@@ -1,41 +1,66 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Building2, Check, Home, PlusCircle, Sparkles } from "lucide-react";
 import { useApp } from "../../../context/AppContext";
+import { workspaceService } from "../api/workspace-service";
 import { WORKSPACE_OPTIONS, WorkspaceType } from "../types";
 
 export function ExperienceSelectionPage() {
   const navigate = useNavigate();
   const { currentUser, setCurrentRole, triggerToast } = useApp();
+  const [isSaving, setIsSaving] = useState(false);
 
-  const selectWorkspace = (workspace: WorkspaceType) => {
-    setCurrentRole(workspace);
-    localStorage.setItem("homifind_workspace_selected", "true");
-    localStorage.setItem("homifind_active_workspace", workspace);
+  const selectWorkspace = async (workspace: WorkspaceType) => {
+    if (!currentUser) return;
 
-    const option = WORKSPACE_OPTIONS.find((item) => item.id === workspace);
-    if (!option) return;
+    setIsSaving(true);
+    try {
+      const persisted = await workspaceService.enable(currentUser.id, workspace);
+      if (persisted) {
+        triggerToast("Workspace saved to your HomiFind account.");
+      }
 
-    if (workspace === "renter") {
-      navigate("/app/onboarding");
-      return;
+      setCurrentRole(workspace);
+      localStorage.setItem("homifind_workspace_selected", "true");
+      localStorage.setItem("homifind_active_workspace", workspace);
+
+      const option = WORKSPACE_OPTIONS.find((item) => item.id === workspace);
+      if (!option) return;
+
+      if (workspace === "renter") {
+        navigate("/app/onboarding");
+        return;
+      }
+
+      if (workspace === "owner") {
+        navigate("/owner/onboarding");
+        return;
+      }
+
+      navigate(option.route);
+    } finally {
+      setIsSaving(false);
     }
-
-    if (workspace === "owner") {
-      navigate("/owner/onboarding");
-      return;
-    }
-
-    navigate(option.route);
   };
 
-  const chooseBoth = () => {
-    localStorage.setItem("homifind_workspace_selected", "true");
-    localStorage.setItem("homifind_has_owner_workspace", "true");
-    localStorage.setItem("homifind_active_workspace", "renter");
-    setCurrentRole("renter");
-    triggerToast("Both renter and owner experiences are enabled for this account.");
-    navigate("/app/onboarding");
+  const chooseBoth = async () => {
+    if (!currentUser) return;
+
+    setIsSaving(true);
+    try {
+      await Promise.all([
+        workspaceService.enable(currentUser.id, "renter"),
+        workspaceService.enable(currentUser.id, "owner"),
+      ]);
+      localStorage.setItem("homifind_workspace_selected", "true");
+      localStorage.setItem("homifind_has_owner_workspace", "true");
+      localStorage.setItem("homifind_active_workspace", "renter");
+      setCurrentRole("renter");
+      triggerToast("Both renter and owner experiences are enabled for this account.");
+      navigate("/app/onboarding");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -64,26 +89,30 @@ export function ExperienceSelectionPage() {
             icon={<Home className="h-6 w-6" />}
             title="Find a Home"
             description="Browse properties and let HomiFind rank the best matches for you."
-            onClick={() => selectWorkspace("renter")}
+            onClick={() => void selectWorkspace("renter")}
+            disabled={isSaving}
           />
           <WorkspaceCard
             icon={<PlusCircle className="h-6 w-6" />}
             title="List a Property"
             description="Upload a property, use AI-assisted listing tools and manage leads."
-            onClick={() => selectWorkspace("owner")}
+            onClick={() => void selectWorkspace("owner")}
+            disabled={isSaving}
           />
           <WorkspaceCard
             icon={<Building2 className="h-6 w-6" />}
             title="Broker Workspace"
             description="Manage listings, clients, applications and conversations as a broker."
-            onClick={() => selectWorkspace("broker")}
+            onClick={() => void selectWorkspace("broker")}
+            disabled={isSaving}
           />
         </div>
 
         <button
           type="button"
-          onClick={chooseBoth}
-          className="mx-auto mt-6 flex items-center gap-2 rounded-full border border-indigo-200 bg-white px-5 py-3 text-xs font-bold text-[#1b206b] shadow-sm hover:bg-indigo-50 transition-colors"
+          onClick={() => void chooseBoth()}
+          disabled={isSaving}
+          className="mx-auto mt-6 flex items-center gap-2 rounded-full border border-indigo-200 bg-white px-5 py-3 text-xs font-bold text-[#1b206b] shadow-sm hover:bg-indigo-50 transition-colors disabled:opacity-50"
         >
           <Check className="h-4 w-4" />
           I want to find a home and list a property
@@ -98,17 +127,20 @@ function WorkspaceCard({
   title,
   description,
   onClick,
+  disabled,
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
   onClick: () => void;
+  disabled: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group text-left bg-white rounded-3xl border border-slate-200 p-7 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-indigo-300 transition-all"
+      disabled={disabled}
+      className="group text-left bg-white rounded-3xl border border-slate-200 p-7 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-indigo-300 transition-all disabled:opacity-60 disabled:hover:translate-y-0"
     >
       <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-[#1b206b] flex items-center justify-center mb-6 group-hover:bg-[#1b206b] group-hover:text-white transition-colors">
         {icon}
