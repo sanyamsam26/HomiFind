@@ -1,4 +1,5 @@
 import { authenticatedFetch } from "./backend-api";
+import { supabase } from "../lib/supabase";
 import type { UserRole } from "../types/database";
 
 export interface WorkspaceRecord {
@@ -8,8 +9,15 @@ export interface WorkspaceRecord {
   updated_at?: string;
 }
 
+async function getCurrentUserId(): Promise<string> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) throw new Error("No authenticated Supabase user.");
+  return data.user.id;
+}
+
 export async function listWorkspaces(): Promise<WorkspaceRecord[]> {
-  const response = await authenticatedFetch("/workspaces");
+  const userId = await getCurrentUserId();
+  const response = await authenticatedFetch(`/workspaces/${userId}`);
   return (await response.json()) as WorkspaceRecord[];
 }
 
@@ -17,7 +25,12 @@ export async function enableWorkspace(workspace: UserRole): Promise<WorkspaceRec
   if (!["renter", "owner", "broker"].includes(workspace)) {
     throw new Error("Unsupported workspace.");
   }
-  const response = await authenticatedFetch(`/workspaces/${workspace}`, { method: "PUT" });
+
+  const userId = await getCurrentUserId();
+  const response = await authenticatedFetch(`/workspaces/${userId}`, {
+    method: "POST",
+    body: JSON.stringify({ workspace: workspace.toUpperCase() }),
+  });
   return (await response.json()) as WorkspaceRecord;
 }
 
