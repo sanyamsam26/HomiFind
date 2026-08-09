@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase";
+import type { Property } from "../types/database";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) || "http://localhost:8080/api/v1";
 
@@ -22,4 +23,15 @@ export async function authenticatedFetch(path: string, init: RequestInit = {}) {
 export async function syncBackendProfile() {
   const response = await authenticatedFetch("/auth/sync", { method: "POST" });
   return response.json();
+}
+
+export interface RecommendationResult {
+  property: Partial<Property> & { id: string };
+  matchScore: number;
+  reasons: string[];
+}
+
+export async function fetchRecommendations(limit = 12): Promise<RecommendationResult[]> {
+  const response = await authenticatedFetch(`/recommendations?limit=${limit}`);
+  return (await response.json()) as RecommendationResult[];
 }
