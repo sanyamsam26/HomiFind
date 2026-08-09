@@ -1,9 +1,8 @@
 package com.homifind.workspace;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
@@ -27,7 +26,7 @@ public class UserWorkspaceEntity {
     private UUID userId;
 
     @Id
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = WorkspaceTypeConverter.class)
     @Column(name = "workspace", nullable = false)
     private WorkspaceType workspace;
 
