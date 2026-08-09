@@ -8,7 +8,6 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        'lucide-react': path.resolve(__dirname, 'src/lib/lucide-react.ts'),
         '@': path.resolve(__dirname, '.'),
       },
     },
